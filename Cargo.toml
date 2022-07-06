@@ -1,0 +1,7 @@
+[workspace]
+members = [
+    "bin",
+    "sqlite-decoder",
+    "sqlite-encoder",
+    "sqlite-types",
+]

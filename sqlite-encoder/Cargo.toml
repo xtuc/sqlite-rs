@@ -1,0 +1,9 @@
+[package]
+name = "sqlite-encoder"
+version = "0.1.0"
+edition = "2021"
+description = "SQLite WAL and database formats encoder"
+authors = ["Sven Sauleau <sven@cloudflare.com>"]
+
+[dependencies]
+sqlite-types = { path = "../sqlite-types" }

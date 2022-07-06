@@ -1,0 +1,28 @@
+[package]
+name = "bin"
+version = "0.1.0"
+edition = "2021"
+publish = false
+description = "SQLite utility binaries"
+authors = ["Sven Sauleau <sven@cloudflare.com>"]
+
+[[bin]]
+name = "decode-db"
+path = "./src/decode-db.rs"
+
+[[bin]]
+name = "decode-wal"
+path = "./src/decode-wal.rs"
+
+[[bin]]
+name = "merge-wal"
+path = "./src/merge-wal.rs"
+
+[[bin]]
+name = "resize-page-db"
+path = "./src/resize-page-db.rs"
+
+[dependencies]
+sqlite-decoder = { path = "../sqlite-decoder" }
+sqlite-encoder = { path = "../sqlite-encoder" }
+
