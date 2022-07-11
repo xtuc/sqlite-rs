@@ -97,7 +97,7 @@ fn decode_frame_header(input: &[u8]) -> IResult<&[u8], WalFrameHeader> {
     ))
 }
 
-fn decode_frame<'a>(input: &'a [u8], wal_header: &WalHeader) -> IResult<&'a [u8], WalFrame<'a>> {
+fn decode_frame<'a, 'b>(input: &'a [u8], wal_header: &'b WalHeader) -> IResult<&'a [u8], WalFrame> {
     let (input, input_frame_header) = take(24usize)(input)?;
     let (_, frame_header) = decode_frame_header(&input_frame_header)?;
 
@@ -114,7 +114,7 @@ fn decode_frame<'a>(input: &'a [u8], wal_header: &WalHeader) -> IResult<&'a [u8]
         input,
         WalFrame {
             header: frame_header,
-            data,
+            data: data.to_owned(),
         },
     ))
 }

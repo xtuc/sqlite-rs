@@ -17,7 +17,7 @@ pub fn encode(wal: Wal) -> Result<Vec<u8>, BoxError> {
 
     for frame in &wal.frames {
         (checksum_1, checksum_2) = frame.header.checksum(checksum_1, checksum_2);
-        (checksum_1, checksum_2) = checksum_bytes(frame.data, checksum_1, checksum_2);
+        (checksum_1, checksum_2) = checksum_bytes(&frame.data, checksum_1, checksum_2);
 
         write_wal_frame(&mut buff, frame, checksum_1, checksum_2).map_err(|err| {
             format!(
@@ -60,7 +60,7 @@ pub fn write_wal_frame(
     checksum_2: u32,
 ) -> Result<(), BoxError> {
     write_wal_frame_header(writer, &frame.header, checksum_1, checksum_2)?;
-    writer.extend(frame.data);
+    writer.extend(&frame.data);
     Ok(())
 }
 

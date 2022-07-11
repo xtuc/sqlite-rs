@@ -56,13 +56,13 @@ pub struct BtreeCellTableLeaf {
     pub row_id: u64,
 }
 
-#[derive(Debug)]
-pub struct Wal<'a> {
+#[derive(Debug, Clone)]
+pub struct Wal {
     pub header: WalHeader,
-    pub frames: Vec<WalFrame<'a>>,
+    pub frames: Vec<WalFrame>,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct WalHeader {
     pub magic_number: u32,
     pub file_format: u32,
@@ -74,7 +74,7 @@ pub struct WalHeader {
     pub checksum_2: u32,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct WalFrameHeader {
     pub page_number: u32,
     pub db_size_after_commit: u32,
@@ -84,13 +84,13 @@ pub struct WalFrameHeader {
     pub checksum_2: u32,
 }
 
-#[derive(Debug)]
-pub struct WalFrame<'a> {
+#[derive(Debug, Clone)]
+pub struct WalFrame {
     pub header: WalFrameHeader,
-    pub data: &'a [u8],
+    pub data: Vec<u8>,
 }
 
-impl<'a> Wal<'a> {
+impl Wal {
     pub fn rewrite_salt_1(mut self, value: u32) -> Self {
         self.header.salt_1 = value;
         for frame in &mut self.frames {
