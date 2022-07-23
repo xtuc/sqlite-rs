@@ -1,4 +1,5 @@
-use sqlite_types::{DbHeader, MAGIC_STRING};
+use sqlite_types::{Db, DbHeader, MAGIC_STRING};
+use std::io::Write;
 
 type BoxError = Box<dyn std::error::Error>;
 
@@ -22,6 +23,33 @@ pub fn encode_header(header: &DbHeader) -> Result<Vec<u8>, BoxError> {
     let mut buff = Vec::new();
 
     write_header(&mut buff, &header).map_err(|err| format!("failed to encode header: {}", err))?;
+
+    Ok(buff)
+}
+
+pub fn encode(db: &Db) -> Result<Vec<u8>, BoxError> {
+    let mut buff = Vec::new();
+    assert_eq!(db.header.db_size as usize, db.pages.len());
+
+    let header_bytes = encode_header(&db.header)?;
+    let mut first_page = db.pages.get(&1).ok_or("missing page 1")?.clone();
+
+    (&mut first_page[0..100])
+        .write(&header_bytes)
+        .map_err(|err| format!("failed to write header: {}", err))?;
+    buff.write(&first_page)
+        .map_err(|err| format!("failed to write first page: {}", err))?;
+
+    for i in 1..db.header.db_size {
+        // Page number are 1 indexed and 1 is the db header
+        let page_number = i + 1;
+
+        let page = db
+            .pages
+            .get(&page_number)
+            .ok_or(format!("page {} missing", page_number))?;
+        write_bytes(&mut buff, page);
+    }
 
     Ok(buff)
 }

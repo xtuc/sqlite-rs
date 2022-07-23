@@ -1,3 +1,4 @@
+use pretty_hex::pretty_hex;
 use std::env::args;
 use std::fs;
 
@@ -6,8 +7,10 @@ fn main() {
     let contents = fs::read(filename).unwrap();
 
     let wal = sqlite_decoder::wal::decode(&contents).unwrap();
-    println!("wal {:?}", wal);
+    println!("Header: {:?}", wal.header);
+    println!("Frames:");
     for frame in wal.frames {
-        println!("frame {:?}", sqlite_decoder::db::decode(&frame.data));
+        println!("{:?}.", frame.header);
+        println!("{}", pretty_hex(&frame.data));
     }
 }

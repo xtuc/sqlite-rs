@@ -22,7 +22,11 @@ path = "./src/merge-wal.rs"
 name = "resize-page-db"
 path = "./src/resize-page-db.rs"
 
+[[bin]]
+name = "backfill-db-from-wal"
+path = "./src/backfill-db-from-wal.rs"
+
 [dependencies]
 sqlite-decoder = { path = "../sqlite-decoder" }
 sqlite-encoder = { path = "../sqlite-encoder" }
-
+pretty-hex = "0.3.0"

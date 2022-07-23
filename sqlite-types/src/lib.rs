@@ -1,12 +1,16 @@
+use std::collections::HashMap;
+
 pub const MAGIC_NUMBER_1: u32 = 0x377f0682;
 pub const MAGIC_NUMBER_2: u32 = 0x377f0683;
 pub const SUPPORTED_FILE_FORMAT: u32 = 3007000;
 pub const MAGIC_STRING: &[u8] = b"SQLite format 3\0";
 
+pub type Page = Vec<u8>;
+
 #[derive(Debug)]
 pub struct Db {
     pub header: DbHeader,
-    pub btree_page: BtreePage,
+    pub pages: HashMap<u32, Page>,
 }
 
 #[derive(Debug)]
@@ -31,29 +35,6 @@ pub struct DbHeader {
     pub app_id: u32,
     pub version_valid_for: u32,
     pub sqlite_version: u32,
-}
-
-#[derive(Debug)]
-pub struct BtreePage {
-    pub page_type: u8,
-    pub first_freeblock: u16,
-    pub num_cells: u16,
-    pub start_cell_content_area: u16,
-    pub num_frag_free_bytes: u8,
-    pub right_most_ptr: u16,
-    pub cells: Vec<BtreeCell>,
-}
-
-#[derive(Debug)]
-pub struct BtreeCell {
-    pub offset: u16,
-    pub data: Option<BtreeCellTableLeaf>,
-}
-
-#[derive(Debug, Clone)]
-pub struct BtreeCellTableLeaf {
-    pub len_payload: u64,
-    pub row_id: u64,
 }
 
 #[derive(Debug, Clone)]

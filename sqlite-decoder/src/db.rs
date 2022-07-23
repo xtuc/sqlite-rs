@@ -2,12 +2,12 @@
 
 use nom::bytes::complete::take;
 use nom::IResult;
-use sqlite_types::{BtreeCell, BtreeCellTableLeaf, BtreePage, Db, DbHeader, MAGIC_STRING};
+use sqlite_types::{Db, DbHeader, MAGIC_STRING};
+use std::collections::HashMap;
 use vlq::ReadVlqExt;
 
 type BoxError = Box<dyn std::error::Error>;
 
-#[derive(Clone)]
 pub struct ParsingContext<'a> {
     input: &'a [u8],
     /// Copy of the original input for data offset
@@ -51,89 +51,40 @@ pub fn decode<'a>(input: &'a [u8]) -> Result<Db, BoxError> {
 }
 
 fn decode_db<'a, 'b>(ctx: ParsingContext<'a>) -> IResult<&'a [u8], Db> {
+    let mut pages = HashMap::new();
+
     let (input, input_header) = take(100usize)(ctx.input)?;
     let (_, header) = decode_header_inner(&input_header)?;
-    let (input, btree_page) = decode_btree_page(ParsingContext {
-        input,
-        original_input: ctx.original_input.clone(),
-    })?;
-    Ok((input, Db { header, btree_page }))
-}
 
-fn decode_btree_page<'a, 'b>(ctx: ParsingContext<'a>) -> IResult<&'a [u8], BtreePage> {
-    let (input, page_type) = read_u8(ctx.input)?;
-    let (input, first_freeblock) = read_u16(input)?;
-    let (input, num_cells) = read_u16(input)?;
-    let (input, start_cell_content_area) = read_u16(input)?;
-    let (input, num_frag_free_bytes) = read_u8(input)?;
+    // Eat align to page size and discard the bytes
+    let (input, bytes) = take(header.page_size - 100)(input)?;
 
-    let (input, right_most_ptr) = if page_type == 2 || page_type == 5 {
-        read_u16(input)?
-    } else {
-        (input, 0)
-    };
+    // First page contains the header and is page aligned
+    let first_page = [input_header, bytes].concat();
+    pages.insert(1, first_page);
 
-    let mut cells = Vec::with_capacity(num_cells as usize);
+    // The remaining bytes should be pages and the number should match the
+    // db_size in the header
+    assert_eq!(
+        input.len(),
+        header.page_size as usize * (header.db_size as usize - 1)
+    );
+
+    let page_count = input.len() / header.page_size as usize;
+    println!("page_count: {}", page_count);
+
     let mut input = input;
-    for _ in 0..num_cells {
-        let ret = decode_btree_cell(ctx.clone(), &page_type)?;
+    for i in 1..=page_count {
+        let ret = take(header.page_size)(input)?;
         input = ret.0;
-        cells.push(ret.1);
+
+        // Page number are 1 indexed and 1 is the db header
+        let page_number = i + 1;
+        pages.insert(page_number as u32, ret.1.to_owned());
     }
 
-    Ok((
-        input,
-        BtreePage {
-            page_type,
-            first_freeblock,
-            num_cells,
-            start_cell_content_area,
-            num_frag_free_bytes,
-            right_most_ptr,
-            cells,
-        },
-    ))
-}
-
-fn decode_btree_cell<'a>(
-    ctx: ParsingContext<'a>,
-    parent_page_type: &'_ u8,
-) -> IResult<&'a [u8], BtreeCell> {
-    assert_eq!(*parent_page_type, 13u8);
-    let (input, offset) = read_u16(ctx.input)?;
-    println!("offset {:?}", offset);
-
-    let data = if (offset as usize) < ctx.original_input.len() {
-        println!("{:?}", ctx.original_input[offset as usize..].to_vec());
-
-        let (_, data) =
-            decode_btree_cell_table_leaf(ctx.original_input[offset as usize..].to_vec()).unwrap();
-        Some(data)
-    // FIXME: remove unwrap
-    } else {
-        None
-    };
-
-    Ok((
-        input,
-        BtreeCell {
-            offset,
-            data: data.clone(),
-        },
-    ))
-}
-
-fn decode_btree_cell_table_leaf(input: Vec<u8>) -> IResult<(), BtreeCellTableLeaf> {
-    // FIXME: remove unwrap
-    let (input, len_payload) = read_vu64(&input).unwrap();
-    let (input, row_id) = read_vu64(input).unwrap();
-    Ok((
-        (),
-        BtreeCellTableLeaf {
-            len_payload,
-            row_id,
-        },
-    ))
+    assert_eq!(pages.len(), header.db_size as usize);
+    Ok((input, Db { header, pages }))
 }
 
 pub fn decode_header(input: &[u8]) -> Result<DbHeader, BoxError> {
