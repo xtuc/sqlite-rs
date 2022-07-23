@@ -1,10 +1,10 @@
 //! https://www.sqlite.org/fileformat.html
 
+use crate::parse_err;
 use nom::bytes::complete::take;
 use nom::IResult;
 use sqlite_types::{Db, DbHeader, MAGIC_STRING};
 use std::collections::HashMap;
-use vlq::ReadVlqExt;
 
 type BoxError = Box<dyn std::error::Error>;
 
@@ -13,15 +13,6 @@ pub struct ParsingContext<'a> {
     /// Copy of the original input for data offset
     /// TODO: remove if possible?
     original_input: Vec<u8>,
-}
-
-fn read_vu64(input: &[u8]) -> IResult<&[u8], u64> {
-    let mut data = std::io::Cursor::new(input.to_vec());
-    println!("data {:?}", data.position());
-    let x: u64 = data.read_vlq().unwrap();
-    println!("data {:?}", data.position());
-
-    Ok((input, x))
 }
 
 fn read_u32(input: &[u8]) -> IResult<&[u8], u32> {
@@ -96,10 +87,8 @@ pub fn decode_header(input: &[u8]) -> Result<DbHeader, BoxError> {
 
 fn decode_header_inner(input: &[u8]) -> IResult<&[u8], DbHeader> {
     let (input, magic_string) = take(16usize)(input)?;
-
     if magic_string != MAGIC_STRING {
-        // FIXME: return error
-        panic!("unsupported file format");
+        return Err(parse_err(magic_string));
     }
 
     let (input, page_size) = read_u16(input)?;

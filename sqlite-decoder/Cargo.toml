@@ -8,4 +8,3 @@ authors = ["Sven Sauleau <sven@cloudflare.com>"]
 [dependencies]
 nom = "7"
 sqlite-types = { path = "../sqlite-types" }
-vlq = { package = "vlq-rust", version = "0.4" }
