@@ -123,8 +123,6 @@ pub fn checksum(input: &[u32], s1: Option<u32>, s2: Option<u32>) -> (u32, u32) {
 
     let mut i = 0;
     loop {
-        println!("data {} {}", input[i], input[i + 1]);
-        println!("s1 {}, s2 {}", s1, s2);
         s1 = s1.wrapping_add(input[i].wrapping_add(s2));
         s2 = s2.wrapping_add(input[i + 1].wrapping_add(s1));
 

@@ -22,7 +22,6 @@ fn main() -> std::io::Result<()> {
     }
 
     for frame in wal.frames {
-        // FIXME: commit frames?
         assert_eq!(wal.header.page_size as usize, frame.data.len());
 
         // Page numbers are 1 indexed

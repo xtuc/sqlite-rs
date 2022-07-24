@@ -4,5 +4,6 @@ version = "0.1.0"
 edition = "2021"
 description = "SQLite Rust types"
 authors = ["Sven Sauleau <sven@cloudflare.com>"]
-
-[dependencies]
+license = "MIT OR Apache-2.0"
+keywords = ["sqlite", "types"]
+repository = "https://github.com/xtuc/sqlite-rs/tree/main/sqlite-types"
