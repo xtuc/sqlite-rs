@@ -4,4 +4,5 @@ members = [
     "sqlite-decoder",
     "sqlite-encoder",
     "sqlite-types",
+    "sqlite-wal",
 ]

@@ -29,4 +29,5 @@ path = "./src/backfill-db-from-wal.rs"
 [dependencies]
 sqlite-decoder = { path = "../sqlite-decoder" }
 sqlite-encoder = { path = "../sqlite-encoder" }
+sqlite-wal = { path = "../sqlite-wal" }
 pretty-hex = "0.3.0"

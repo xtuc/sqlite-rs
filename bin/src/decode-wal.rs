@@ -10,7 +10,11 @@ fn main() {
     println!("Header: {:?}", wal.header);
     println!("Frames:");
     for frame in wal.frames {
-        println!("{:?}.", frame.header);
+        println!("{:?}", frame.header);
+        if frame.header.page_number == 1 {
+            let db_header = sqlite_decoder::db::decode_header(&frame.data).unwrap();
+            println!("new header: {:?}", db_header);
+        }
         println!("{}", pretty_hex(&frame.data));
     }
 }

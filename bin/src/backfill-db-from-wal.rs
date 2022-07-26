@@ -14,38 +14,7 @@ fn main() -> std::io::Result<()> {
     let mut db = sqlite_decoder::db::decode(&db_contents).unwrap();
     let wal = sqlite_decoder::wal::decode(&wal_contents).unwrap();
 
-    if db.header.page_size as u32 != wal.header.page_size {
-        panic!(
-            "Error: page_size mismatch between WAL ({}) and DB ({}).",
-            wal.header.page_size, db.header.page_size
-        );
-    }
-
-    for frame in wal.frames {
-        assert_eq!(wal.header.page_size as usize, frame.data.len());
-
-        // Page numbers are 1 indexed
-
-        if frame.header.page_number == 1 {
-            // Update the database header
-            let new_header = sqlite_decoder::db::decode_header(&frame.data).unwrap();
-            println!("replace header: {:?}", new_header);
-            db.header = new_header;
-        } else if let Some(page) = db.pages.get_mut(&frame.header.page_number) {
-            *page = frame.data;
-            println!("replace page: {}", frame.header.page_number);
-        } else {
-            db.pages.insert(frame.header.page_number, frame.data);
-            db.header.db_size += 1;
-            println!("create new page: {}", frame.header.page_number);
-        }
-
-        if frame.header.db_size_after_commit != 0
-            && (frame.header.db_size_after_commit as usize) < db.pages.len() - 1
-        {
-            todo!("truncate");
-        }
-    }
+    sqlite_wal::backfill(&mut db, &wal).unwrap();
 
     let bytes = sqlite_encoder::db::encode(&db).unwrap();
 
