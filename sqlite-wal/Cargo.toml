@@ -11,3 +11,8 @@ repository = "https://github.com/xtuc/sqlite-rs/tree/main/sqlite-wal"
 [dependencies]
 sqlite-types = { path = "../sqlite-types", version = "0.1.0" }
 sqlite-decoder = { path = "../sqlite-decoder", version = "0.1.0" }
+sqlite-encoder = { path = "../sqlite-encoder", version = "0.1.0" }
+
+[dev-dependencies]
+rusqlite = { version = "0.28.0", features = ["bundled"] }
+tempfile = "3.3.0"

@@ -4,6 +4,7 @@ pub const MAGIC_NUMBER_1: u32 = 0x377f0682;
 pub const MAGIC_NUMBER_2: u32 = 0x377f0683;
 pub const SUPPORTED_FILE_FORMAT: u32 = 3007000;
 pub const MAGIC_STRING: &[u8] = b"SQLite format 3\0";
+pub const SQLITE_3_37_2_VERSION: u32 = 3038002;
 
 pub type Page = Vec<u8>;
 
@@ -13,7 +14,7 @@ pub struct Db {
     pub pages: HashMap<u32, Page>,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct DbHeader {
     pub page_size: u16,
     pub file_format_write_version: u8,

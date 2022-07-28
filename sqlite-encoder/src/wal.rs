@@ -94,20 +94,20 @@ fn checksum_bytes(bytes: &[u8], checksum_1: u32, checksum_2: u32) -> (u32, u32) 
 mod tests {
     use super::*;
 
-    #[test]
-    fn test_calc_checksum_wal_frame() {
-        let header = WalHeader {
-            magic_number: MAGIC_NUMBER_2,
-            file_format: SUPPORTED_FILE_FORMAT,
-            page_size: 4096,
-            checkpoint_seq: 0,
-            salt_1: 1,
-            salt_2: 2,
-            checksum_1: 3,
-            checksum_2: 4,
-        };
-        let (s0, s1) = header.checksum();
-        println!("s0 {} s1 {}", s0, s1);
-        panic!()
-    }
+    // #[test]
+    // fn test_calc_checksum_wal_frame() {
+    //     let header = WalHeader {
+    //         magic_number: MAGIC_NUMBER_2,
+    //         file_format: SUPPORTED_FILE_FORMAT,
+    //         page_size: 4096,
+    //         checkpoint_seq: 0,
+    //         salt_1: 1,
+    //         salt_2: 2,
+    //         checksum_1: 3,
+    //         checksum_2: 4,
+    //     };
+    //     let (s0, s1) = header.checksum();
+    //     println!("s0 {} s1 {}", s0, s1);
+    //     panic!()
+    // }
 }

@@ -1,7 +1,7 @@
 use sqlite_types::{Db, DbHeader, MAGIC_STRING};
 use std::io::Write;
 
-type BoxError = Box<dyn std::error::Error>;
+type BoxError = Box<dyn std::error::Error + Send + Sync>;
 
 fn write_bytes(writer: &mut Vec<u8>, value: &[u8]) {
     writer.extend_from_slice(value);
@@ -29,7 +29,6 @@ pub fn encode_header(header: &DbHeader) -> Result<Vec<u8>, BoxError> {
 
 pub fn encode(db: &Db) -> Result<Vec<u8>, BoxError> {
     let mut buff = Vec::new();
-    assert_eq!(db.header.db_size as usize, db.pages.len());
 
     let header_bytes = encode_header(&db.header)?;
     let mut first_page = db.pages.get(&1).ok_or("missing page 1")?.clone();
@@ -44,11 +43,12 @@ pub fn encode(db: &Db) -> Result<Vec<u8>, BoxError> {
         // Page number are 1 indexed and 1 is the db header
         let page_number = i + 1;
 
-        let page = db
-            .pages
-            .get(&page_number)
-            .ok_or(format!("page {} missing", page_number))?;
-        write_bytes(&mut buff, page);
+        if let Some(page) = db.pages.get(&page_number) {
+            write_bytes(&mut buff, page);
+        } else {
+            // The page didn't exists, write an empty one
+            write_bytes(&mut buff, &vec![0u8; db.header.page_size as usize]);
+        }
     }
 
     Ok(buff)
