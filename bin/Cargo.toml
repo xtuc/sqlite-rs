@@ -26,8 +26,13 @@ path = "./src/resize-page-db.rs"
 name = "backfill-db-from-wal"
 path = "./src/backfill-db-from-wal.rs"
 
+[[bin]]
+name = "wal-to-db"
+path = "./src/wal-to-db.rs"
+
 [dependencies]
 sqlite-decoder = { path = "../sqlite-decoder" }
 sqlite-encoder = { path = "../sqlite-encoder" }
+sqlite-types = { path = "../sqlite-types" }
 sqlite-wal = { path = "../sqlite-wal" }
 pretty-hex = "0.3.0"

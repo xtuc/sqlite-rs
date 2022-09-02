@@ -1,7 +1,8 @@
 //! https://sqlite.org/fileformat.html#walformat
 
+use crate::IResult;
+use crate::ParserError;
 use nom::bytes::complete::take;
-use nom::IResult;
 use sqlite_types::{
     Wal, WalFrame, WalFrameHeader, WalHeader, MAGIC_NUMBER_1, MAGIC_NUMBER_2, SUPPORTED_FILE_FORMAT,
 };
@@ -43,15 +44,18 @@ fn decode_header(input: &[u8]) -> IResult<&[u8], WalHeader> {
     let (input, magic_number) = read_u32(input)?;
 
     if magic_number != MAGIC_NUMBER_1 && magic_number != MAGIC_NUMBER_2 {
-        // FIXME: return error
-        panic!("magic number not found, got: {:?}", magic_number);
+        return Err(nom::Err::Failure(ParserError(format!(
+            "magic number not found, got: {:?}",
+            magic_number
+        ))));
     }
 
     let (input, file_format) = read_u32(input)?;
 
     if file_format != SUPPORTED_FILE_FORMAT {
-        // FIXME: return error
-        panic!("unsupported file format");
+        return Err(nom::Err::Failure(ParserError(format!(
+            "unsupported file format"
+        ))));
     }
 
     let (input, page_size) = read_u32(input)?;
@@ -102,8 +106,7 @@ fn decode_frame<'a, 'b>(input: &'a [u8], wal_header: &'b WalHeader) -> IResult<&
     let (_, frame_header) = decode_frame_header(&input_frame_header)?;
 
     if wal_header.salt_1 != frame_header.salt_1 || wal_header.salt_2 != frame_header.salt_2 {
-        // FIXME: return error
-        panic!("Salt don't match");
+        return Err(nom::Err::Failure(ParserError(format!("Salt don't match"))));
     }
 
     // FIXME: check for `The checksum values in the final 8 bytes of the frame-header exactly match the checksum computed consecutively on the first 24 bytes of the WAL header and the first 8 bytes and the content of all frames up to and including the current frame.`

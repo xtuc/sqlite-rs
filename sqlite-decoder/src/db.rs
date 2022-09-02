@@ -1,19 +1,11 @@
 //! https://www.sqlite.org/fileformat.html
-
-use crate::parse_err;
+use crate::IResult;
+use crate::ParserError;
 use nom::bytes::complete::take;
-use nom::IResult;
 use sqlite_types::{Db, DbHeader, MAGIC_STRING};
 use std::collections::HashMap;
 
 type BoxError = Box<dyn std::error::Error>;
-
-pub struct ParsingContext<'a> {
-    input: &'a [u8],
-    /// Copy of the original input for data offset
-    /// TODO: remove if possible?
-    original_input: Vec<u8>,
-}
 
 fn read_u32(input: &[u8]) -> IResult<&[u8], u32> {
     let (input, value) = take(4usize)(input)?;
@@ -31,20 +23,16 @@ fn read_u8(input: &[u8]) -> IResult<&[u8], u8> {
 }
 
 pub fn decode<'a>(input: &'a [u8]) -> Result<Db, BoxError> {
-    let ctx = ParsingContext {
-        input,
-        original_input: input.clone().to_vec(),
-    };
-    match decode_db(ctx) {
+    match decode_db(input) {
         Ok((_, db)) => Ok(db),
         Err(err) => Err(format!("failed to decode: {}", err).into()),
     }
 }
 
-fn decode_db<'a, 'b>(ctx: ParsingContext<'a>) -> IResult<&'a [u8], Db> {
+fn decode_db<'a, 'b>(input: &'a [u8]) -> IResult<&'a [u8], Db> {
     let mut pages = HashMap::new();
 
-    let (input, input_header) = take(100usize)(ctx.input)?;
+    let (input, input_header) = take(100usize)(input)?;
     let (_, header) = decode_header_inner(&input_header)?;
 
     // Eat align to page size and discard the bytes
@@ -88,7 +76,10 @@ pub fn decode_header(input: &[u8]) -> Result<DbHeader, BoxError> {
 fn decode_header_inner(input: &[u8]) -> IResult<&[u8], DbHeader> {
     let (input, magic_string) = take(16usize)(input)?;
     if magic_string != MAGIC_STRING {
-        return Err(parse_err(magic_string));
+        return Err(nom::Err::Failure(ParserError(format!(
+            "magic string not found, got: {:?}",
+            magic_string
+        ))));
     }
 
     let (input, page_size) = read_u16(input)?;

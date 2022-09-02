@@ -10,8 +10,15 @@ fn main() {
 
     println!("Header: {:?}", db.header);
     println!("Pages:");
-    for (i, page) in db.pages {
-        println!("page {} data {} bytes.", i, page.len());
-        println!("{}", pretty_hex(&page));
+    for i in 0..db.header.db_size {
+        // Page number are 1 indexed and 1 is the db header
+        let page_number = i + 1;
+
+        if let Some(page) = db.pages.get(&page_number) {
+            println!("page {} data {} bytes.", i, page.len());
+            println!("{}", pretty_hex(&page));
+        } else {
+            println!("page {} data empty.", i);
+        }
     }
 }
