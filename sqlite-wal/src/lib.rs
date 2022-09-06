@@ -25,18 +25,47 @@ pub fn backfill(db: &mut sqlite_types::Db, wal: &sqlite_types::Wal) -> Result<()
             if frame.header.page_number == 1 {
                 // The first page (page are 1 indexed) is the header
                 let new_header = sqlite_decoder::db::decode_header(&frame.data).unwrap();
-                println!("replace header: {:?}", new_header);
                 db.header = new_header;
             }
 
             *page = frame.data.clone();
-            println!("replace page: {}", frame.header.page_number);
         } else {
             db.pages
                 .insert(frame.header.page_number, frame.data.clone());
             db.header.db_size += 1;
-            println!("create new page: {}", frame.header.page_number);
         }
+    }
+
+    Ok(())
+}
+
+pub fn backfill_bytes(wal: &sqlite_types::Wal, db_bytes: &mut Vec<u8>) -> Result<(), Error> {
+    let db_header = sqlite_decoder::db::decode_header(&db_bytes)
+        .map_err(|err| format!("failed to decode database header: {}", err))?;
+
+    if db_header.page_size as u32 != wal.header.page_size {
+        return Err(format!(
+            "Error: page_size mismatch between WAL ({}) and DB ({}).",
+            wal.header.page_size, db_header.page_size
+        )
+        .into());
+    }
+
+    for frame in &wal.frames {
+        assert_eq!(wal.header.page_size as usize, frame.data.len());
+
+        let db_offset = (frame.header.page_number as usize - 1) * wal.header.page_size as usize;
+        let end = db_offset + wal.header.page_size as usize;
+
+        if end > db_bytes.len() {
+            // Writing a new page requires growing the database
+            db_bytes.resize(end, 0);
+        }
+
+        let wrote = (&mut db_bytes[db_offset..end])
+            .write(&frame.data)
+            .map_err(|err| format!("failed to write: {}", err))?;
+        assert_eq!(wrote, wal.header.page_size as usize);
     }
 
     Ok(())

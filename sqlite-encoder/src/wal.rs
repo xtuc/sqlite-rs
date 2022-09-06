@@ -1,6 +1,4 @@
-use sqlite_types::{
-    checksum, Wal, WalFrame, WalFrameHeader, WalHeader, MAGIC_NUMBER_2, SUPPORTED_FILE_FORMAT,
-};
+use sqlite_types::{checksum, Wal, WalFrame, WalFrameHeader, WalHeader, MAGIC_NUMBER_2};
 
 type BoxError = Box<dyn std::error::Error>;
 
