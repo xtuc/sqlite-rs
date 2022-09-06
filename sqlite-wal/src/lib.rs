@@ -1,3 +1,4 @@
+use std::cmp;
 ///! Module to manipulate WAL files
 use std::collections::HashMap;
 use std::io::Write;
@@ -37,6 +38,16 @@ pub fn backfill(db: &mut sqlite_types::Db, wal: &sqlite_types::Wal) -> Result<()
     }
 
     Ok(())
+}
+
+pub fn hint_db_size(wal: &sqlite_types::Wal) -> Result<usize, Error> {
+    let mut max_page_count = 0u32;
+
+    for frame in &wal.frames {
+        max_page_count = cmp::min(max_page_count, frame.header.db_size_after_commit);
+    }
+
+    Ok(max_page_count as usize * wal.header.page_size as usize)
 }
 
 pub fn backfill_bytes(wal: &sqlite_types::Wal, db_bytes: &mut Vec<u8>) -> Result<(), Error> {
