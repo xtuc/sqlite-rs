@@ -1,26 +1,12 @@
 //! https://www.sqlite.org/fileformat.html
+use crate::util::{read_u16, read_u32, read_u8};
 use crate::IResult;
 use crate::ParserError;
 use nom::bytes::complete::take;
-use sqlite_types::{Db, DbHeader, MAGIC_STRING};
+use sqlite_types::{Db, DbHeader, TextEncoding, MAGIC_STRING};
 use std::collections::HashMap;
 
 type BoxError = Box<dyn std::error::Error>;
-
-fn read_u32(input: &[u8]) -> IResult<&[u8], u32> {
-    let (input, value) = take(4usize)(input)?;
-    Ok((input, u32::from_be_bytes(value.try_into().unwrap())))
-}
-
-fn read_u16(input: &[u8]) -> IResult<&[u8], u16> {
-    let (input, value) = take(2usize)(input)?;
-    Ok((input, u16::from_be_bytes(value.try_into().unwrap())))
-}
-
-fn read_u8(input: &[u8]) -> IResult<&[u8], u8> {
-    let (input, value) = take(1usize)(input)?;
-    Ok((input, u8::from_be_bytes(value.try_into().unwrap())))
-}
 
 pub fn decode<'a>(input: &'a [u8]) -> Result<Db, BoxError> {
     match decode_db(input) {
@@ -73,6 +59,25 @@ pub fn decode_header(input: &[u8]) -> Result<DbHeader, BoxError> {
     }
 }
 
+fn decode_text_encoding(input: &[u8]) -> IResult<&[u8], TextEncoding> {
+    let (input, t) = read_u32(input)?;
+
+    use TextEncoding::*;
+    let enc = match t {
+        1 => UTF8,
+        2 => UTF16le,
+        3 => UTF16be,
+        e => {
+            return Err(nom::Err::Failure(ParserError(format!(
+                "unsupported text encoding: {}",
+                e
+            ))))
+        }
+    };
+
+    Ok((input, enc))
+}
+
 fn decode_header_inner(input: &[u8]) -> IResult<&[u8], DbHeader> {
     let (input, magic_string) = take(16usize)(input)?;
     if magic_string != MAGIC_STRING {
@@ -97,7 +102,7 @@ fn decode_header_inner(input: &[u8]) -> IResult<&[u8], DbHeader> {
     let (input, schema_format_number) = read_u32(input)?;
     let (input, default_page_cache_size) = read_u32(input)?;
     let (input, page_num_largest_root_btree) = read_u32(input)?;
-    let (input, text_encoding) = read_u32(input)?;
+    let (input, text_encoding) = decode_text_encoding(input)?;
     let (input, user_version) = read_u32(input)?;
     let (input, vaccum_mode) = read_u32(input)?;
     let (input, app_id) = read_u32(input)?;

@@ -1,4 +1,5 @@
 pub mod db;
+mod util;
 pub mod wal;
 
 #[derive(Debug)]

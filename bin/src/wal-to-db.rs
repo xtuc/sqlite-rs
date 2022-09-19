@@ -27,7 +27,7 @@ fn main() -> std::io::Result<()> {
         schema_format_number: 4,
         default_page_cache_size: 0,
         page_num_largest_root_btree: 0,
-        text_encoding: 1,
+        text_encoding: sqlite_types::TextEncoding::UTF8,
         user_version: 0,
         vaccum_mode: 0,
         app_id: 0,

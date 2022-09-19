@@ -6,6 +6,13 @@ pub const SUPPORTED_FILE_FORMAT: u32 = 3007000;
 pub const MAGIC_STRING: &[u8] = b"SQLite format 3\0";
 pub const SQLITE_3_37_2_VERSION: u32 = 3038002;
 
+#[derive(Debug, Clone)]
+pub enum TextEncoding {
+    UTF8,
+    UTF16le,
+    UTF16be,
+}
+
 pub type Page = Vec<u8>;
 
 #[derive(Debug)]
@@ -33,7 +40,7 @@ pub struct DbHeader {
     pub schema_format_number: u32,
     pub default_page_cache_size: u32,
     pub page_num_largest_root_btree: u32,
-    pub text_encoding: u32,
+    pub text_encoding: TextEncoding,
     pub user_version: u32,
     pub vaccum_mode: u32,
     pub app_id: u32,

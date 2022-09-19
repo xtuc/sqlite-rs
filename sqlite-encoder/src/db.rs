@@ -1,4 +1,4 @@
-use sqlite_types::{Db, DbHeader, MAGIC_STRING};
+use sqlite_types::{Db, DbHeader, TextEncoding, MAGIC_STRING};
 use std::io::Write;
 
 type BoxError = Box<dyn std::error::Error + Send + Sync>;
@@ -77,13 +77,26 @@ fn write_header(writer: &mut Vec<u8>, header: &DbHeader) -> Result<(), BoxError>
     write_u32(writer, header.schema_format_number);
     write_u32(writer, header.default_page_cache_size);
     write_u32(writer, header.page_num_largest_root_btree);
-    write_u32(writer, header.text_encoding);
+    write_text_encoding(writer, &header.text_encoding)?;
     write_u32(writer, header.user_version);
     write_u32(writer, header.vaccum_mode);
     write_u32(writer, header.app_id);
     write_bytes(writer, &[0; 20]);
     write_u32(writer, header.version_valid_for);
     write_u32(writer, header.sqlite_version);
+
+    Ok(())
+}
+
+fn write_text_encoding(writer: &mut Vec<u8>, enc: &TextEncoding) -> Result<(), BoxError> {
+    use TextEncoding::*;
+
+    let v = match enc {
+        UTF8 => 1,
+        UTF16le => 2,
+        UTF16be => 3,
+    };
+    write_u32(writer, v);
 
     Ok(())
 }
