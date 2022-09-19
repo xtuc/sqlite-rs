@@ -35,4 +35,5 @@ sqlite-decoder = { path = "../sqlite-decoder" }
 sqlite-encoder = { path = "../sqlite-encoder" }
 sqlite-types = { path = "../sqlite-types" }
 sqlite-wal = { path = "../sqlite-wal" }
+sqlite-table = { path = "../sqlite-table" }
 pretty-hex = "0.3.0"

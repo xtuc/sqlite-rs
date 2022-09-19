@@ -5,4 +5,5 @@ members = [
     "sqlite-encoder",
     "sqlite-types",
     "sqlite-wal",
+    "sqlite-table",
 ]

@@ -1,0 +1,13 @@
+[package]
+name = "sqlite-table"
+version = "0.1.0"
+edition = "2021"
+description = "SQLite inpection and manipulation on tables"
+authors = ["Sven Sauleau <sven@cloudflare.com>"]
+license = "MIT OR Apache-2.0"
+keywords = ["sqlite", "tables", "database", "b-tree"]
+repository = "https://github.com/xtuc/sqlite-rs/tree/main/sqlite-table"
+
+[dependencies]
+sqlite-decoder = { path = "../sqlite-decoder", version = "0.1.0" }
+sqlite-types = { path = "../sqlite-types", version = "0.1.0" }

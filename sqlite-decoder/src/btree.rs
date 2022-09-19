@@ -6,11 +6,39 @@ use crate::ParserError;
 use nom::bytes::complete::take;
 use sqlite_types::TextEncoding;
 
+type BoxError = Box<dyn std::error::Error>;
+
+#[derive(Debug)]
+pub enum Record {
+    Null,
+    Int8(i8),
+    Int16(i16),
+    Blob(Vec<u8>),
+    Text(String),
+}
+
+impl Record {
+    pub fn as_string(&self) -> String {
+        match self {
+            Self::Text(v) => v.clone(),
+            Self::Null => "NULL".to_owned(),
+            v => unreachable!("expected string, given {:?}", v),
+        }
+    }
+
+    pub fn as_int(&self) -> usize {
+        match self {
+            Self::Int8(v) => *v as usize,
+            Self::Int16(v) => *v as usize,
+            _ => unreachable!(),
+        }
+    }
+}
+
 #[derive(Clone)]
-struct InputContext<'a> {
-    input: &'a [u8],
-    original_input: Vec<u8>,
-    curr_offset: usize,
+pub struct InputContext<'a> {
+    pub(crate) input: &'a [u8],
+    pub(crate) original_input: Vec<u8>,
 }
 
 #[derive(Debug)]
@@ -26,12 +54,15 @@ pub enum Cell {
 pub struct TableBTreeLeafCell {
     /// A varint which is the integer key, a.k.a. "rowid"
     rowid: u64,
-    records: Vec<Record>,
+    pub records: Vec<Record>,
     page_first_overflow: Option<u32>,
 }
 
 #[derive(Debug)]
-pub struct TableBTreeInteriorCell {}
+pub struct TableBTreeInteriorCell {
+    pub left_child_page: u32,
+    pub rowid: u64,
+}
 
 #[derive(Debug)]
 pub struct IndexBTreeLeafCell {}
@@ -51,8 +82,8 @@ pub struct BtreeHeader {
 
 #[derive(Debug)]
 pub struct Btree {
-    header: BtreeHeader,
-    cells: Vec<Cell>,
+    pub header: BtreeHeader,
+    pub cells: Vec<Cell>,
 }
 
 #[derive(Debug)]
@@ -78,22 +109,6 @@ impl PageType {
     fn is_interior(&self) -> bool {
         matches!(self, PageType::Interior(_))
     }
-}
-
-/// Decodes SQLite schema table
-/// The table is always located at page 1 (after the db3 header)
-pub fn decode_sqlite_schema(db: &sqlite_types::Db) -> Btree {
-    let page = db.pages.get(&1).unwrap();
-    let bytes = &page[100..];
-
-    let input = InputContext {
-        original_input: page.to_owned(),
-        input: bytes,
-        curr_offset: 100,
-    };
-    let enc = &db.header.text_encoding;
-    let (_, btree) = decode_btree(enc, input).unwrap();
-    btree
 }
 
 fn decode_page_type<'a>(input: InputContext<'a>) -> IResult<InputContext<'a>, PageType> {
@@ -163,6 +178,10 @@ fn decode_cell<'a>(
             let (input, cell) = decode_table_leaf_cell(enc, input)?;
             (input, Cell::TableBTreeLeafCell(cell))
         }
+        PageType::Interior(PageContent::Table) => {
+            let (input, cell) = decode_table_interior_cell(input)?;
+            (input, Cell::TableBTreeInteriorCell(cell))
+        }
         e => {
             return Err(nom::Err::Failure(ParserError(format!(
                 "unsupported cell with parent: {:?}",
@@ -172,6 +191,21 @@ fn decode_cell<'a>(
     };
 
     Ok((input, cell))
+}
+
+fn decode_table_interior_cell<'a>(
+    input: InputContext<'a>,
+) -> IResult<InputContext<'a>, TableBTreeInteriorCell> {
+    let (input, left_child_page) = input.read_u32()?;
+    let (input, rowid) = input.read_varint()?;
+
+    Ok((
+        input,
+        TableBTreeInteriorCell {
+            left_child_page,
+            rowid,
+        },
+    ))
 }
 
 fn decode_table_leaf_cell<'a>(
@@ -239,15 +273,6 @@ fn decode_record_columns<'a>(mut input: &'a [u8]) -> IResult<&'a [u8], Vec<u64>>
     Ok((input, columns.to_owned()))
 }
 
-#[derive(Debug)]
-enum Record {
-    Null,
-    Int8(i8),
-    Int16(i16),
-    Blob(Vec<u8>),
-    Text(String),
-}
-
 fn decode_record_value<'a>(
     enc: &TextEncoding,
     serial_type: u64,
@@ -295,6 +320,33 @@ fn decode_record_value<'a>(
     Ok((input, serial_type))
 }
 
+/// Decode the B-Tree on the first page
+pub fn decode_first_page<'a>(enc: &'a TextEncoding, page: &'a [u8]) -> Result<Btree, BoxError> {
+    // first 100 of the first page are for the database header but preserve the
+    // original input for the absolute offset seek.
+    let input = &page[100..];
+    let input = InputContext {
+        input,
+        original_input: page.to_owned(),
+    };
+    match decode_btree(enc, input) {
+        Ok((_, btree)) => Ok(btree),
+        Err(err) => Err(format!("failed to decode: {}", err).into()),
+    }
+}
+
+/// Decode the B-Tree on a page
+pub fn decode<'a>(enc: &'a TextEncoding, input: &'a [u8]) -> Result<Btree, BoxError> {
+    let input = InputContext {
+        input,
+        original_input: input.to_owned(),
+    };
+    match decode_btree(enc, input) {
+        Ok((_, btree)) => Ok(btree),
+        Err(err) => Err(format!("failed to decode: {}", err).into()),
+    }
+}
+
 fn decode_btree<'a>(
     enc: &TextEncoding,
     input: InputContext<'a>,
@@ -324,11 +376,9 @@ fn decode_btree<'a>(
 
 impl<'a> InputContext<'a> {
     fn seek_at(&'a self, offset: usize) -> InputContext<'a> {
-        // let curr_offset = offset - self.curr_offset;
         let input = &self.original_input[offset..];
         Self {
             input,
-            curr_offset: 0,
             original_input: self.original_input.clone(),
         }
     }
@@ -339,7 +389,6 @@ impl<'a> InputContext<'a> {
             Self {
                 input,
                 original_input: self.original_input,
-                curr_offset: self.curr_offset + 4,
             },
             v,
         ))
@@ -350,7 +399,6 @@ impl<'a> InputContext<'a> {
         Ok((
             Self {
                 input,
-                curr_offset: self.curr_offset + 2,
                 original_input: self.original_input,
             },
             v,
@@ -362,7 +410,6 @@ impl<'a> InputContext<'a> {
         Ok((
             Self {
                 input,
-                curr_offset: self.curr_offset + 1,
                 original_input: self.original_input,
             },
             v,
@@ -375,7 +422,6 @@ impl<'a> InputContext<'a> {
         Ok((
             Self {
                 input,
-                curr_offset: 999, // FIXME: remove I guess
                 original_input: self.original_input,
             },
             v,
@@ -388,7 +434,6 @@ impl<'a> InputContext<'a> {
         Ok((
             Self {
                 input,
-                curr_offset: self.curr_offset + n,
                 original_input: self.original_input,
             },
             bytes,
