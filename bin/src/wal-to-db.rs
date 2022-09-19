@@ -13,7 +13,7 @@ fn main() -> std::io::Result<()> {
 
     // Values taken from a newly created sqlite3 database
     let db_header = sqlite_types::DbHeader {
-        page_size: wal.header.page_size as u16,
+        page_size: wal.header.page_size,
         file_format_write_version: 2,
         file_format_read_version: 2,
         max_embedded_payload_frac: 64,

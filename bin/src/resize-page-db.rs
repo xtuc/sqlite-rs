@@ -1,12 +1,12 @@
 use std::env::args;
-use std::io::Write;
 use std::fs;
 use std::fs::File;
+use std::io::Write;
 
 fn main() -> std::io::Result<()> {
     let args: Vec<String> = args().collect();
     let db_filename = &args[1];
-    let new_page_size = args[2].parse::<u16>().unwrap();
+    let new_page_size = args[2].parse::<u32>().unwrap();
 
     let mut db_contents = fs::read(db_filename).unwrap();
 

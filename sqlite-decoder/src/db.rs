@@ -105,6 +105,12 @@ fn decode_header_inner(input: &[u8]) -> IResult<&[u8], DbHeader> {
     let (input, version_valid_for) = read_u32(input)?;
     let (input, sqlite_version) = read_u32(input)?;
 
+    let page_size = if page_size == 1 {
+        65536
+    } else {
+        page_size as u32
+    };
+
     Ok((
         input,
         DbHeader {

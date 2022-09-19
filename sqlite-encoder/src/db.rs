@@ -55,8 +55,14 @@ pub fn encode(db: &Db) -> Result<Vec<u8>, BoxError> {
 }
 
 fn write_header(writer: &mut Vec<u8>, header: &DbHeader) -> Result<(), BoxError> {
+    let page_size = if header.page_size == 65536 {
+        1u16
+    } else {
+        header.page_size as u16
+    };
+
     write_bytes(writer, MAGIC_STRING);
-    write_u16(writer, header.page_size);
+    write_u16(writer, page_size);
     write_byte(writer, header.file_format_write_version);
     write_byte(writer, header.file_format_read_version);
     write_byte(writer, 0);

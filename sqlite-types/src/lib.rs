@@ -16,7 +16,10 @@ pub struct Db {
 
 #[derive(Debug, Clone)]
 pub struct DbHeader {
-    pub page_size: u16,
+    /// Page size of the database
+    /// While it should be of type u16,
+    /// it uses u32 to support the special 64kib page size.
+    pub page_size: u32,
     pub file_format_write_version: u8,
     pub file_format_read_version: u8,
     pub max_embedded_payload_frac: u8,
