@@ -1,3 +1,4 @@
+pub mod btree;
 pub mod db;
 mod util;
 pub mod wal;

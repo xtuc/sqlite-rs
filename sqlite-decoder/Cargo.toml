@@ -5,7 +5,7 @@ edition = "2021"
 description = "SQLite WAL and database formats decoder"
 authors = ["Sven Sauleau <sven@cloudflare.com>"]
 license = "MIT OR Apache-2.0"
-keywords = ["sqlite", "decoder", "wal", "database"]
+keywords = ["sqlite", "decoder", "wal", "database", "b-tree"]
 repository = "https://github.com/xtuc/sqlite-rs/tree/main/sqlite-decoder"
 
 [dependencies]
