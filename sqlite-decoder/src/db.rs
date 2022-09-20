@@ -36,7 +36,6 @@ fn decode_db<'a, 'b>(input: &'a [u8]) -> IResult<&'a [u8], Db> {
     );
 
     let page_count = input.len() / header.page_size as usize;
-    println!("page_count: {}", page_count);
 
     let mut input = input;
     for i in 1..=page_count {
