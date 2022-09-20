@@ -50,7 +50,7 @@ impl Table {
 
                     prev_rowid = Some(end);
                 }
-                _ => unimplemented!(),
+                e => unimplemented!("{:?}", e),
             }
         }
 

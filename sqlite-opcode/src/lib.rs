@@ -27,7 +27,7 @@ pub fn explain(program: Vec<Instr>, schemas: &sqlite_table::Schemas) -> Explanat
             Opcode::OpenRead | Opcode::OpenWrite | Opcode::ReopenIdx
         ) {
             let id = match instr.p2 {
-                serde_json::value::Value::Number(n) => n.as_u64().unwrap_or_default() as usize,
+                serde_json::value::Value::Number(n) => n.as_f64().unwrap_or_default() as usize,
                 _ => unreachable!(),
             };
 
