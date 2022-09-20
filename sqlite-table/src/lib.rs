@@ -50,7 +50,11 @@ impl Table {
 
                     prev_rowid = Some(end);
                 }
-                e => unimplemented!("{:?}", e),
+                sqlite_decoder::btree::Cell::TableBTreeLeafCell(_) => {
+                    // The table is small enough to fit on the root_page
+                    // and doesn't have interior btree.
+                }
+                _ => unimplemented!(),
             }
         }
 
