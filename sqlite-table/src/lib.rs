@@ -2,13 +2,15 @@ use sqlite_decoder::btree;
 use std::collections::HashMap;
 use std::ops::RangeInclusive;
 
+pub type Schemas = HashMap<String, Schema>;
+
 #[derive(Debug)]
 pub enum Schema {
     Table(Table),
     Index(Index),
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Table {
     pub name: String,
     pub sql: String,
@@ -59,9 +61,26 @@ pub struct Index {
     pub root_page: u32,
 }
 
+pub fn find_table_by_root(rootpage: usize, schemas: &Schemas) -> Option<Table> {
+    let mut table = None;
+
+    for (_, schema) in schemas {
+        match schema {
+            Schema::Table(schema) => {
+                if schema.root_page as usize == rootpage {
+                    table = Some(schema.clone());
+                }
+            }
+            _ => {}
+        }
+    }
+
+    table
+}
+
 /// Decodes SQLite schema table
 /// The table is always located at page 1 (after the db3 header)
-pub fn decode_sqlite_schema(db: &sqlite_types::Db) -> HashMap<String, Schema> {
+pub fn decode_sqlite_schema(db: &sqlite_types::Db) -> Schemas {
     let page = db.pages.get(&1).unwrap();
 
     let enc = &db.header.text_encoding;
