@@ -1,6 +1,6 @@
 [package]
 name = "sqlite-decoder"
-version = "0.1.0"
+version = "0.1.1"
 edition = "2021"
 description = "SQLite WAL and database formats decoder"
 authors = ["Sven Sauleau <sven@cloudflare.com>"]
@@ -10,4 +10,4 @@ repository = "https://github.com/xtuc/sqlite-rs/tree/main/sqlite-decoder"
 
 [dependencies]
 nom = "7"
-sqlite-types = { path = "../sqlite-types", version = "0.1.0" }
+sqlite-types = { path = "../sqlite-types", version = "0.1.1" }

@@ -1,6 +1,6 @@
 [package]
 name = "sqlite-types"
-version = "0.1.0"
+version = "0.1.1"
 edition = "2021"
 description = "SQLite Rust types"
 authors = ["Sven Sauleau <sven@cloudflare.com>"]
