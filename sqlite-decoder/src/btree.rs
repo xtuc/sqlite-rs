@@ -290,13 +290,13 @@ fn decode_record_value<'a>(
             (input, Int16(i16::from_be_bytes(value.try_into().unwrap())))
         }
         v if v > 12 && v % 2 == 0 => {
-            let size = (v - 12) / 2;
+            let size = (v as usize - 12) / 2;
             let (input, bytes) = take(size)(input)?;
 
             (input, Blob(bytes.to_owned()))
         }
         v if v > 13 && v % 2 != 0 => {
-            let size = (v - 13) / 2;
+            let size = (v as usize - 13) / 2;
 
             let (input, bytes) = take(size)(input)?;
 
