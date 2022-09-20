@@ -3,6 +3,7 @@ use std::collections::HashMap;
 use std::ops::RangeInclusive;
 
 pub type Schemas = HashMap<String, Schema>;
+type BoxError = Box<dyn std::error::Error>;
 
 #[derive(Debug)]
 pub enum Schema {
@@ -24,9 +25,13 @@ pub struct PageWithRowidRange {
 }
 
 impl Table {
-    pub fn list_pages(&self, db: &sqlite_types::Db) -> Vec<PageWithRowidRange> {
-        let page = db.pages.get(&self.root_page).unwrap();
-        let res = sqlite_decoder::btree::decode(&db.header.text_encoding, page).unwrap();
+    pub fn list_pages(&self, db: &sqlite_types::Db) -> Result<Vec<PageWithRowidRange>, BoxError> {
+        let page = db.pages.get(&self.root_page).ok_or(format!(
+            "table root page ({}) not found in the database",
+            self.root_page
+        ))?;
+        let res = sqlite_decoder::btree::decode(&db.header.text_encoding, page)
+            .map_err(|err| format!("failed to decode B-tree: {}", err))?;
 
         let mut page_list = Vec::new();
 
@@ -49,7 +54,7 @@ impl Table {
             }
         }
 
-        page_list
+        Ok(page_list)
     }
 }
 
@@ -80,11 +85,16 @@ pub fn find_table_by_root(rootpage: usize, schemas: &Schemas) -> Option<Table> {
 
 /// Decodes SQLite schema table
 /// The table is always located at page 1 (after the db3 header)
-pub fn decode_sqlite_schema(db: &sqlite_types::Db) -> Schemas {
-    let page = db.pages.get(&1).unwrap();
+pub fn decode_sqlite_schema(db: &sqlite_types::Db) -> Result<Schemas, BoxError> {
+    let root = 1;
+    let page = db.pages.get(&root).ok_or(format!(
+        "table root page ({}) not found in the database",
+        root
+    ))?;
 
     let enc = &db.header.text_encoding;
-    let btree = btree::decode_first_page(enc, page).unwrap();
+    let btree = btree::decode_first_page(enc, page)
+        .map_err(|err| format!("failed to decode B-tree: {}", err))?;
 
     let mut schemas = HashMap::new();
 
@@ -118,5 +128,5 @@ pub fn decode_sqlite_schema(db: &sqlite_types::Db) -> Schemas {
         }
     }
 
-    schemas
+    Ok(schemas)
 }
