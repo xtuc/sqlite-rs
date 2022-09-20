@@ -64,6 +64,7 @@ fn decode_text_encoding(input: &[u8]) -> IResult<&[u8], TextEncoding> {
 
     use TextEncoding::*;
     let enc = match t {
+        0 => Unspecified,
         1 => UTF8,
         2 => UTF16le,
         3 => UTF16be,

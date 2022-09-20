@@ -8,6 +8,7 @@ pub const SQLITE_3_37_2_VERSION: u32 = 3038002;
 
 #[derive(Debug, Clone)]
 pub enum TextEncoding {
+    Unspecified,
     UTF8,
     UTF16le,
     UTF16be,

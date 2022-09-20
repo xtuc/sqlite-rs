@@ -92,6 +92,7 @@ fn write_text_encoding(writer: &mut Vec<u8>, enc: &TextEncoding) -> Result<(), B
     use TextEncoding::*;
 
     let v = match enc {
+        Unspecified => 0,
         UTF8 => 1,
         UTF16le => 2,
         UTF16be => 3,

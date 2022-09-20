@@ -304,7 +304,7 @@ fn decode_record_value<'a>(
             let bytes = bytes.to_vec();
             let value = match enc {
                 UTF8 => String::from_utf8(bytes).unwrap(),
-                UTF16le | UTF16be => unimplemented!(),
+                _ => unimplemented!(),
             };
 
             (input, Text(value))
