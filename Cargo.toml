@@ -6,4 +6,5 @@ members = [
     "sqlite-types",
     "sqlite-wal",
     "sqlite-table",
+    "sqlite-opcode",
 ]
