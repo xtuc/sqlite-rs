@@ -32,6 +32,7 @@ pub fn explain(program: Vec<Instr>, schemas: &sqlite_table::Schemas) -> Explanat
             };
 
             table = sqlite_table::find_table_by_root(id, schemas);
+            break;
         }
     }
 
