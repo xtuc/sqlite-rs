@@ -7,3 +7,6 @@ authors = ["Sven Sauleau <sven@cloudflare.com>"]
 license = "MIT OR Apache-2.0"
 keywords = ["sqlite", "page", "cache"]
 repository = "https://github.com/xtuc/sqlite-rs/tree/main/sqlite-pagecache"
+
+[dependencies]
+log = "0.4"

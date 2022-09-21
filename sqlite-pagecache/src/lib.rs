@@ -5,6 +5,7 @@
 mod ffi_bindgen;
 
 use ffi_bindgen as ffi;
+use std::collections::HashMap;
 use std::os::raw::{c_int, c_uint, c_void};
 use std::ptr;
 
@@ -15,11 +16,16 @@ pub enum InitState {
 
 type BoxError = Box<dyn std::error::Error>;
 
-pub struct PageWithMetadata {
-    pub page: Vec<u8>,
-    pub metadata: Vec<u8>,
+pub fn make_page<'a>(page_size: usize, extra_size: usize) -> Page {
+    let page = vec![0u8; page_size].into_boxed_slice();
+    let extra = vec![0u8; extra_size].into_boxed_slice();
+    Page {
+        pBuf: Box::into_raw(page) as *mut c_void,
+        pExtra: Box::into_raw(extra) as *mut c_void,
+    }
 }
 
+#[derive(PartialEq)]
 pub enum CreateFlag {
     /// Do not allocate a new page. Return NULL.
     NoAllocation,
@@ -32,6 +38,7 @@ pub enum CreateFlag {
     Allocate,
 }
 
+#[derive(Debug)]
 pub enum DiscardStrategy {
     /// The page must be evicted from the cache
     MustBeEvicted,
@@ -40,7 +47,7 @@ pub enum DiscardStrategy {
     CanDecide,
 }
 
-pub trait PageCacheBuiler<T: PageCache> {
+pub trait PageCacheBuiler<'a, T: PageCache<'a>> {
     /// SQLite invokes the `create` method to construct a new cache instance.
     /// SQLite will typically create one cache instance for each open database file, though this is
     /// not guaranteed.  The first parameter, `page_size`, is the size in bytes of the pages that
@@ -60,7 +67,10 @@ pub trait PageCacheBuiler<T: PageCache> {
     /// contain any unpinned pages.
     fn create(page_size: usize, extra_size: usize, bpurgeable: bool) -> T;
 }
-pub trait PageCache {
+
+pub use ffi::sqlite3_pcache_page as Page;
+
+pub trait PageCache<'a> {
     /// The `cache_size` method may be called at any time by SQLite to set the suggested maximum
     /// cache-size (number of pages stored by) the cache instance passed as the first argument.
     /// This is the value configured using the SQLite "PRAGMA cache_size" command. It
@@ -81,7 +91,7 @@ pub trait PageCache {
     /// a createFlag of AllocateIfConvenient failed. In between the `fetch` calls, SQLite may
     /// attempt to unpin one or more cache pages by spilling the content of pinned pages to disk
     /// and synching the operating system disk cache.
-    fn fetch(&mut self, key: usize, create_flag: CreateFlag) -> Option<&mut PageWithMetadata>;
+    fn fetch(&'a mut self, key: usize, create_flag: CreateFlag) -> Option<&'a mut Page>;
 
     /// `unpin` is called by SQLite with a pointer to a currently pinned page.
     /// The page cache implementation may choose to evict unpinned pages at any time.
@@ -108,29 +118,27 @@ pub trait PageCache {
     fn shrink(&mut self);
 }
 
-struct Context<T: PageCache> {
-    pcache: T,
-}
-
-pub fn build<B: PageCacheBuiler<T>, T: PageCache>() -> *mut ffi::sqlite3_pcache_methods2 {
+pub fn build<'a, B: PageCacheBuiler<'a, T>, T: PageCache<'a> + 'a>(
+) -> *mut ffi::sqlite3_pcache_methods2 {
     Box::into_raw(Box::new(ffi::sqlite3_pcache_methods2 {
         iVersion: 1,
         pArg: ptr::null_mut(),
         xInit: Some(pcache::init),
         xShutdown: Some(pcache::shutdown),
-        xCreate: Some(pcache::create::<B, T>),
-        xCachesize: Some(pcache::cache_size::<T>),
-        xPagecount: Some(pcache::page_count::<T>),
-        xFetch: Some(pcache::fetch::<T>),
-        xUnpin: Some(pcache::unpin::<T>),
-        xRekey: Some(pcache::rekey::<T>),
-        xTruncate: Some(pcache::truncate::<T>),
-        xDestroy: Some(pcache::destroy::<T>),
-        xShrink: Some(pcache::shrink::<T>),
+        xCreate: Some(pcache::create::<'a, B, T>),
+        xCachesize: Some(pcache::cache_size::<'a, T>),
+        xPagecount: Some(pcache::page_count::<'a, T>),
+        xFetch: Some(pcache::fetch::<'a, T>),
+        xUnpin: Some(pcache::unpin::<'a, T>),
+        xRekey: Some(pcache::rekey::<'a, T>),
+        xTruncate: Some(pcache::truncate::<'a, T>),
+        xDestroy: Some(pcache::destroy::<'a, T>),
+        xShrink: Some(pcache::shrink::<'a, T>),
     }))
 }
 
 pub fn register(pcache: *mut ffi::sqlite3_pcache_methods2) -> Result<(), BoxError> {
+    log::trace!("register SQLITE_CONFIG_PCACHE2");
     let ret = unsafe { ffi::sqlite3_config(ffi::SQLITE_CONFIG_PCACHE2, pcache) };
     if ret != ffi::SQLITE_OK {
         Err(format!("sqlite3_config returned code: {}", ret).into())
@@ -139,20 +147,42 @@ pub fn register(pcache: *mut ffi::sqlite3_pcache_methods2) -> Result<(), BoxErro
     }
 }
 
+struct Context<T> {
+    start_canary: u64,
+
+    inner: T,
+    page_ptr_to_keys: HashMap<*const c_void, usize>,
+
+    end_canary: u64,
+}
+
+use std::fmt;
+
+impl<T> fmt::Debug for Context<T> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("Context")
+            .field("start_canary", &self.start_canary)
+            .field("page_ptr_to_keys", &self.page_ptr_to_keys)
+            .field("end_canary", &self.end_canary)
+            .finish()
+    }
+}
+
+impl<T> Drop for Context<T> {
+    fn drop(&mut self) {
+        panic!("nope")
+    }
+}
+
 mod pcache {
     use super::*;
 
-    fn null_ptr_error() -> std::io::Error {
-        std::io::Error::new(std::io::ErrorKind::Other, "received null pointer")
-    }
-
-    fn get_ctx<'a, T: PageCache>(ptr: *mut ffi::sqlite3_pcache) -> &'a mut Context<T> {
-        unsafe {
-            (ptr as *mut Context<T>)
-                .as_mut()
-                .ok_or_else(null_ptr_error)
-                .unwrap()
-        }
+    fn get_ctx<'b, T>(ptr: *mut ffi::sqlite3_pcache) -> &'b mut Context<T> {
+        let ctx = unsafe { &mut *(ptr as *mut Context<T>) };
+        log::trace!("ctx {:?}", ctx);
+        assert_eq!(ctx.start_canary, 0xaaaabbbbccccdddd);
+        assert_eq!(ctx.end_canary, 0x1111222233334444);
+        ctx
     }
 
     pub(super) extern "C" fn init(_arg1: *mut c_void) -> c_int {
@@ -160,35 +190,48 @@ mod pcache {
     }
     pub(super) extern "C" fn shutdown(_arg1: *mut c_void) {}
 
-    pub(super) extern "C" fn create<Builder: PageCacheBuiler<T>, T: PageCache>(
+    pub(super) extern "C" fn create<'a, Builder: PageCacheBuiler<'a, T>, T: PageCache<'a>>(
         page_size: c_int,
         extra_size: c_int,
         bpurgeable: c_int,
     ) -> *mut ffi::sqlite3_pcache {
         let bpurgeable = if bpurgeable == 1 { true } else { false };
         let pcache = Builder::create(page_size as usize, extra_size as usize, bpurgeable);
+        let ctx = Box::new(Context {
+            start_canary: 0xaaaabbbbccccdddd,
+            inner: pcache,
+            page_ptr_to_keys: HashMap::new(),
+            end_canary: 0x1111222233334444,
+        });
 
-        Box::into_raw(Box::new(pcache)) as *mut ffi::sqlite3_pcache
+        let ctx = Box::into_raw(ctx) as *mut ffi::sqlite3_pcache;
+        log::trace!("create ctx={:?}", ctx);
+        ctx
     }
 
-    pub(super) extern "C" fn cache_size<T: PageCache>(
+    pub(super) extern "C" fn cache_size<'a, T: PageCache<'a> + 'a>(
         arg1: *mut ffi::sqlite3_pcache,
         n_cache_size: c_int,
     ) {
+        log::trace!("cache_size arg1={:?} n_cache_size={}", arg1, n_cache_size);
         let ctx = get_ctx::<T>(arg1);
-        ctx.pcache.cache_size(n_cache_size as usize);
+        ctx.inner.cache_size(n_cache_size as usize);
     }
 
-    pub(super) extern "C" fn page_count<T: PageCache>(arg1: *mut ffi::sqlite3_pcache) -> c_int {
+    pub(super) extern "C" fn page_count<'a, T: PageCache<'a> + 'a>(
+        arg1: *mut ffi::sqlite3_pcache,
+    ) -> c_int {
+        log::trace!("page_count arg1={:?}", arg1);
         let ctx = get_ctx::<T>(arg1);
-        ctx.pcache.page_count() as c_int
+        ctx.inner.page_count() as c_int
     }
 
-    pub(super) extern "C" fn fetch<T: PageCache>(
+    pub(super) extern "C" fn fetch<'a, T: PageCache<'a> + 'a>(
         arg1: *mut ffi::sqlite3_pcache,
         key: c_uint,
         create_flag: c_int,
-    ) -> *mut ffi::sqlite3_pcache_page {
+    ) -> *mut Page {
+        log::trace!("fetch arg1={:?}", arg1);
         let ctx = get_ctx::<T>(arg1);
         let create_flag = match create_flag {
             0 => CreateFlag::NoAllocation,
@@ -196,61 +239,77 @@ mod pcache {
             2 => CreateFlag::Allocate,
             v => panic!("unknown create_flag: {}", v),
         };
-        match ctx.pcache.fetch(key as usize, create_flag) {
+        match ctx.inner.fetch(key as usize, create_flag) {
             None => ptr::null_mut(),
-            Some(buffers) => {
-                let res = ffi::sqlite3_pcache_page {
-                    pBuf: buffers.page.as_mut_ptr() as *mut ::std::os::raw::c_void,
-                    pExtra: buffers.metadata.as_mut_ptr() as *mut ::std::os::raw::c_void,
-                };
-                Box::into_raw(Box::new(res))
+            Some(page) => {
+                let addr = page as *mut Page as *const c_void;
+                log::trace!("[page_ptr_to_keys] fetch addr={:?} key={}", addr, key);
+                ctx.page_ptr_to_keys.insert(addr, key as usize);
+
+                log::trace!("page: {:?}", page);
+                page as *mut Page
             }
         }
     }
 
-    pub(super) extern "C" fn unpin<T: PageCache>(
+    pub(super) extern "C" fn unpin<'a, T: PageCache<'a> + 'a>(
         arg1: *mut ffi::sqlite3_pcache,
         arg2: *mut ffi::sqlite3_pcache_page,
         discard: c_int,
     ) {
-        todo!();
+        log::trace!("unpin arg1={:?}", arg1);
         let ctx = get_ctx::<T>(arg1);
-        let discard = match discard {
-            0 => DiscardStrategy::CanDecide,
-            _ => DiscardStrategy::MustBeEvicted,
-        };
-        // FIXME: keep a cache key cache? Identification seems to be based on
-        // pointers.
-        let key = 999;
 
-        ctx.pcache.unpin(key, discard);
+        let addr = arg2 as *const c_void;
+        log::trace!("[page_ptr_to_keys] unpin addr={:?}", addr);
+        if let Some(key) = ctx.page_ptr_to_keys.get(&addr) {
+            log::trace!("[page_ptr_to_keys] unpin key={}", key);
+
+            let discard = match discard {
+                0 => DiscardStrategy::CanDecide,
+                _ => DiscardStrategy::MustBeEvicted,
+            };
+
+            ctx.inner.unpin(*key, discard);
+        } else {
+            log::trace!("[page_ptr_to_keys] unpin key not found");
+        }
     }
 
-    pub(super) extern "C" fn rekey<T: PageCache>(
+    pub(super) extern "C" fn rekey<'a, T: PageCache<'a> + 'a>(
         arg1: *mut ffi::sqlite3_pcache,
-        arg2: *mut ffi::sqlite3_pcache_page,
+        _arg2: *mut ffi::sqlite3_pcache_page,
         old_key: c_uint,
         new_key: c_uint,
     ) {
+        log::trace!("rekey arg1={:?}", arg1);
         let ctx = get_ctx::<T>(arg1);
-        ctx.pcache.rekey(old_key as usize, new_key as usize);
+        ctx.inner.rekey(old_key as usize, new_key as usize);
     }
 
-    pub(super) extern "C" fn truncate<T: PageCache>(
+    pub(super) extern "C" fn truncate<'a, T: PageCache<'a> + 'a>(
         arg1: *mut ffi::sqlite3_pcache,
         i_limit: c_uint,
     ) {
+        log::trace!("truncate arg1={:?}", arg1);
         let ctx = get_ctx::<T>(arg1);
-        ctx.pcache.truncate(i_limit as usize);
+        ctx.inner.truncate(i_limit as usize);
     }
 
-    pub(super) extern "C" fn destroy<T: PageCache>(arg1: *mut ffi::sqlite3_pcache) {
+    pub(super) extern "C" fn destroy<'a, T: PageCache<'a> + 'a>(arg1: *mut ffi::sqlite3_pcache) {
+        log::trace!("destroy arg1={:?}", arg1);
+
         let ctx = get_ctx::<T>(arg1);
-        ctx.pcache.destroy();
+        ctx.inner.destroy();
+
+        unsafe {
+            let _ = Box::from_raw(arg1);
+        }
     }
 
-    pub(super) extern "C" fn shrink<T: PageCache>(arg1: *mut ffi::sqlite3_pcache) {
+    pub(super) extern "C" fn shrink<'a, T: PageCache<'a> + 'a>(arg1: *mut ffi::sqlite3_pcache) {
+        log::trace!("shink arg1={:?}", arg1);
         let ctx = get_ctx::<T>(arg1);
-        ctx.pcache.shrink();
+        ctx.inner.shrink();
     }
 }
