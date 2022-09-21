@@ -7,4 +7,5 @@ members = [
     "sqlite-wal",
     "sqlite-table",
     "sqlite-opcode",
+    "sqlite-pagecache",
 ]

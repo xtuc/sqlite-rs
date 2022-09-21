@@ -1,0 +1,9 @@
+[package]
+name = "sqlite-pagecache"
+version = "0.1.0"
+edition = "2021"
+description = "SQLite Application Defined Page Cache interface"
+authors = ["Sven Sauleau <sven@cloudflare.com>"]
+license = "MIT OR Apache-2.0"
+keywords = ["sqlite", "page", "cache"]
+repository = "https://github.com/xtuc/sqlite-rs/tree/main/sqlite-pagecache"
