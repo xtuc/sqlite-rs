@@ -6,9 +6,10 @@ fn main() {
     let filename = args().last().unwrap();
     let contents = fs::read(filename).unwrap();
 
-    let db = sqlite_decoder::db::decode(&contents).unwrap();
+    let header = sqlite_decoder::db::decode_header(&contents).unwrap();
+    println!("Header: {:?}", header);
 
-    println!("Header: {:?}", db.header);
+    let db = sqlite_decoder::db::decode(&contents).unwrap();
     println!("Pages:");
     for i in 0..db.header.db_size {
         // Page number are 1 indexed and 1 is the db header

@@ -147,10 +147,17 @@ pub fn register(pcache: *mut ffi::sqlite3_pcache_methods2) -> Result<(), BoxErro
     }
 }
 
+/// Context wrapping the user page cache implementation.
+/// Canaries are used to detect memory corruptions.
 struct Context<T> {
     start_canary: u64,
 
+    /// Page cache user implementation
     inner: T,
+
+    /// Mapping between the page in cache its corresponding ptr.
+    /// SQLite refers to the ptr for some operations, the mapping is used to
+    /// resolve the page.
     page_ptr_to_keys: HashMap<*const c_void, usize>,
 
     end_canary: u64,
@@ -161,9 +168,7 @@ use std::fmt;
 impl<T> fmt::Debug for Context<T> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("Context")
-            .field("start_canary", &self.start_canary)
             .field("page_ptr_to_keys", &self.page_ptr_to_keys)
-            .field("end_canary", &self.end_canary)
             .finish()
     }
 }
