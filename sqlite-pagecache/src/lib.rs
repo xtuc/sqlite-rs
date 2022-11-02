@@ -277,21 +277,26 @@ mod pcache {
 
             ctx.inner.unpin(*key, discard);
         } else {
-            log::trace!("[page_ptr_to_keys] unpin key not found");
+            log::trace!("[page_ptr_to_keys] unpin page not found");
         }
     }
 
     pub(super) extern "C" fn rekey<'a, T: PageCache<'a> + 'a>(
         arg1: *mut ffi::sqlite3_pcache,
-        _arg2: *mut ffi::sqlite3_pcache_page,
+        arg2: *mut ffi::sqlite3_pcache_page,
         old_key: c_uint,
         new_key: c_uint,
     ) {
-        log::trace!("rekey arg1={:?}", arg1);
+        let addr = arg2 as *const c_void;
+        log::trace!("rekey arg1={:?} addr={:?}", arg1, addr);
         let ctx = get_ctx::<T>(arg1);
         ctx.inner.rekey(old_key as usize, new_key as usize);
-        // FIXME: update maping in page_ptr_to_keys
-        todo!()
+
+        if let Some(entry) = ctx.page_ptr_to_keys.get_mut(&addr) {
+            *entry = new_key as usize;
+        } else {
+            log::trace!("[page_ptr_to_keys] rekey page not found");
+        }
     }
 
     pub(super) extern "C" fn truncate<'a, T: PageCache<'a> + 'a>(
