@@ -38,7 +38,7 @@ pub enum CreateFlag {
     Allocate,
 }
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq)]
 pub enum DiscardStrategy {
     /// The page must be evicted from the cache
     MustBeEvicted,
@@ -290,6 +290,8 @@ mod pcache {
         log::trace!("rekey arg1={:?}", arg1);
         let ctx = get_ctx::<T>(arg1);
         ctx.inner.rekey(old_key as usize, new_key as usize);
+        // FIXME: update maping in page_ptr_to_keys
+        todo!()
     }
 
     pub(super) extern "C" fn truncate<'a, T: PageCache<'a> + 'a>(
