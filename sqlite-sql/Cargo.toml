@@ -1,0 +1,11 @@
+[package]
+name = "sqlite-sql"
+version = "0.1.0"
+edition = "2021"
+description = "SQLite's SQL interpretation"
+authors = ["Sven Sauleau <sven@cloudflare.com>"]
+license = "MIT OR Apache-2.0"
+keywords = ["sqlite", "sql", "statements"]
+repository = "https://github.com/xtuc/sqlite-rs/tree/main/sqlite-sql"
+
+[dependencies]
