@@ -3,6 +3,8 @@ enum State {
     Normal,
     AtSeperator,
     InBegin,
+    InString,
+    InIdent,
 }
 
 pub fn split_statements(input: &str) -> Vec<String> {
@@ -24,6 +26,26 @@ pub fn split_statements(input: &str) -> Vec<String> {
             continue;
         }
 
+        if state == State::InIdent {
+            buffer.push(b);
+
+            if b == ']' {
+                state = State::Normal;
+            }
+
+            continue;
+        }
+
+        if state == State::InString {
+            buffer.push(b);
+
+            if b == '\'' || b == '"' || b == '`' {
+                state = State::Normal;
+            }
+
+            continue;
+        }
+
         if state == State::Normal {
             buffer.push(b);
 
@@ -32,6 +54,14 @@ pub fn split_statements(input: &str) -> Vec<String> {
                 if buffer.ends_with("BEGIN ") {
                     state = State::InBegin;
                 }
+            }
+
+            if b == '\'' || b == '"' || b == '`' {
+                state = State::InString;
+            }
+
+            if b == '[' {
+                state = State::InIdent;
             }
 
             if b == ';' {
@@ -103,5 +133,70 @@ mod tests {
         "#,
         );
         assert_eq!(stmts, vec!["SELECT 1;", "SELECT 2;"]);
+    }
+
+    #[test]
+    fn it_against_sql_split() {
+        // Taken from https://github.com/jvasile/sql_split/blob/main/src/lib.rs
+
+        assert_eq!(
+            split_statements("CREATE TABLE foo (bar text)"),
+            vec!["CREATE TABLE foo (bar text)"],
+            "Trailing semi-colon is optional"
+        );
+        assert_eq!(
+            split_statements("CREATE TABLE foo (bar text);"),
+            vec!["CREATE TABLE foo (bar text);"],
+            "We preserve the semi-colons"
+        );
+        assert_eq!(
+            split_statements("CREATE TABLE foo (bar text); INSERT into foo (bar) VALUES ('hi')"),
+            vec![
+                "CREATE TABLE foo (bar text);",
+                "INSERT into foo (bar) VALUES ('hi')"
+            ]
+        );
+        assert_eq!(
+            split_statements("invalid sql; but we don't care because we don't really parse it;"),
+            vec![
+                "invalid sql;",
+                "but we don't care because we don't really parse it;"
+            ]
+        );
+        assert_eq!(
+            split_statements("INSERT INTO foo (bar) VALUES ('semicolon in string: ;')"),
+            vec!["INSERT INTO foo (bar) VALUES ('semicolon in string: ;')"]
+        );
+        assert_eq!(
+            split_statements(
+                "INSERT INTO foo (bar) VALUES (\"semicolon in double-quoted string: ;\")"
+            ),
+            vec!["INSERT INTO foo (bar) VALUES (\"semicolon in double-quoted string: ;\")"]
+        );
+        assert_eq!(
+            split_statements("INSERT INTO foo (bar) VALUES (`semicolon in backtick string: ;`)"),
+            vec!["INSERT INTO foo (bar) VALUES (`semicolon in backtick string: ;`)"]
+        );
+        assert_eq!(
+            split_statements(
+                "INSERT INTO foo (bar) VALUES ('interior quote and semicolon in string: ;''')"
+            ),
+            vec!["INSERT INTO foo (bar) VALUES ('interior quote and semicolon in string: ;''')"]
+        );
+        assert_eq!(split_statements("INSERT INTO foo (bar) VALUES (\"interior quote and semicolon in double-quoted string: ;\"\"\")"), vec!["INSERT INTO foo (bar) VALUES (\"interior quote and semicolon in double-quoted string: ;\"\"\")"]);
+        assert_eq!(split_statements("INSERT INTO foo (bar) VALUES (`interior quote and semicolon in backtick string: ;```)"), vec!["INSERT INTO foo (bar) VALUES (`interior quote and semicolon in backtick string: ;```)"]);
+        assert_eq!(
+            split_statements("INSERT INTO foo (bar) VALUES (`semicolon after interior quote ``;`)"),
+            vec!["INSERT INTO foo (bar) VALUES (`semicolon after interior quote ``;`)"]
+        );
+        assert_eq!(
+            split_statements(
+                "CREATE TABLE [foo;bar] (bar: text); INSERT into foo (bar) VALUES ('hi')"
+            ),
+            vec![
+                "CREATE TABLE [foo;bar] (bar: text);",
+                "INSERT into foo (bar) VALUES ('hi')"
+            ]
+        ); // brackets are ok for identifiers in sqlite
     }
 }
