@@ -55,6 +55,11 @@ pub fn split_statements(input: &str) -> Vec<String> {
                     state = State::InBegin;
                 }
             }
+            if b == '\n' {
+                if buffer.ends_with("BEGIN\n") {
+                    state = State::InBegin;
+                }
+            }
 
             if b == '\'' || b == '"' || b == '`' {
                 state = State::InString;
@@ -133,6 +138,18 @@ mod tests {
         "#,
         );
         assert_eq!(stmts, vec!["SELECT 1;", "SELECT 2;"]);
+
+        let stmts = split_statements(
+            r#"CREATE TRIGGER trigger AFTER INSERT ON t
+BEGIN
+    SELECT 1;
+END;
+        "#,
+        );
+        assert_eq!(
+            stmts,
+            vec!["CREATE TRIGGER trigger AFTER INSERT ON t\nBEGIN\n    SELECT 1;\nEND;"]
+        );
     }
 
     #[test]
