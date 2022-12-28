@@ -216,4 +216,12 @@ END;
             ]
         ); // brackets are ok for identifiers in sqlite
     }
+
+    #[test]
+    fn it_recognizes_strings() {
+        assert_eq!(
+            split_statements("INSERT INTO projects VALUES(';;;');"),
+            vec!["INSERT INTO projects VALUES(';;;');",]
+        );
+    }
 }
