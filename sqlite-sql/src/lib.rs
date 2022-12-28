@@ -228,8 +228,13 @@ END;
     #[test]
     fn it_closing_bracket() {
         assert_eq!(
-            split_statements("UPDATE test SET str = 'update]';"),
-            vec!["UPDATE test SET str = 'update]';"]
+            split_statements(
+                "UPDATE test SET str = 'update]'; UPDATE test SET str = 'second update';"
+            ),
+            vec![
+                "UPDATE test SET str = 'update]';",
+                "UPDATE test SET str = 'second update';"
+            ]
         );
     }
 }
