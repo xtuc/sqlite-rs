@@ -224,4 +224,12 @@ END;
             vec!["INSERT INTO projects VALUES(';;;');",]
         );
     }
+
+    #[test]
+    fn it_closing_bracket() {
+        assert_eq!(
+            split_statements("UPDATE test SET str = 'update]';"),
+            vec!["UPDATE test SET str = 'update]';"]
+        );
+    }
 }
