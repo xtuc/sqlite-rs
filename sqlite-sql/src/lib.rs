@@ -1,9 +1,14 @@
+#[cfg(test)]
+use pretty_assertions::assert_eq as pretty_eq;
+
 #[derive(PartialEq)]
 enum State {
     Normal,
     AtSeperator,
     InBegin,
-    InString,
+    InStringSQ, // '
+    InStringDQ, // "
+    InStringBT, // `
     InIdent,
 }
 
@@ -36,10 +41,30 @@ pub fn split_statements(input: &str) -> Vec<String> {
             continue;
         }
 
-        if state == State::InString {
+        if state == State::InStringSQ {
             buffer.push(b);
 
-            if b == '\'' || b == '"' || b == '`' {
+            if b == '\'' {
+                state = State::Normal;
+            }
+
+            continue;
+        }
+
+        if state == State::InStringDQ {
+            buffer.push(b);
+
+            if b == '"' {
+                state = State::Normal;
+            }
+
+            continue;
+        }
+
+        if state == State::InStringBT {
+            buffer.push(b);
+
+            if b == '`' {
                 state = State::Normal;
             }
 
@@ -61,8 +86,14 @@ pub fn split_statements(input: &str) -> Vec<String> {
                 }
             }
 
-            if b == '\'' || b == '"' || b == '`' {
-                state = State::InString;
+            if b == '\'' {
+                state = State::InStringSQ;
+            }
+            if b == '"' {
+                state = State::InStringDQ;
+            }
+            if b == '`' {
+                state = State::InStringBT;
             }
 
             if b == '[' {
@@ -106,14 +137,14 @@ mod tests {
     #[test]
     fn it_split_statements() {
         let stmts = split_statements("SELECT 1; SELECT 2");
-        assert_eq!(stmts, vec!["SELECT 1;", "SELECT 2"]);
+        pretty_eq!(stmts, vec!["SELECT 1;", "SELECT 2"]);
     }
 
     #[test]
     fn it_keep_statement_with_begin() {
         let stmts =
             split_statements("CREATE TRIGGER trigger AFTER INSERT ON t BEGIN SELECT 1; END;");
-        assert_eq!(
+        pretty_eq!(
             stmts,
             vec!["CREATE TRIGGER trigger AFTER INSERT ON t BEGIN SELECT 1; END;"]
         );
@@ -121,7 +152,7 @@ mod tests {
         let stmts = split_statements(
             "CREATE TRIGGER trigger AFTER INSERT ON t BEGIN SELECT 1; END; SELECT 1",
         );
-        assert_eq!(
+        pretty_eq!(
             stmts,
             vec![
                 "CREATE TRIGGER trigger AFTER INSERT ON t BEGIN SELECT 1; END;",
@@ -137,7 +168,7 @@ mod tests {
                            SELECT 2;
         "#,
         );
-        assert_eq!(stmts, vec!["SELECT 1;", "SELECT 2;"]);
+        pretty_eq!(stmts, vec!["SELECT 1;", "SELECT 2;"]);
 
         let stmts = split_statements(
             r#"CREATE TRIGGER trigger AFTER INSERT ON t
@@ -146,7 +177,7 @@ BEGIN
 END;
         "#,
         );
-        assert_eq!(
+        pretty_eq!(
             stmts,
             vec!["CREATE TRIGGER trigger AFTER INSERT ON t\nBEGIN\n    SELECT 1;\nEND;"]
         );
@@ -156,57 +187,57 @@ END;
     fn it_against_sql_split() {
         // Taken from https://github.com/jvasile/sql_split/blob/main/src/lib.rs
 
-        assert_eq!(
+        pretty_eq!(
             split_statements("CREATE TABLE foo (bar text)"),
             vec!["CREATE TABLE foo (bar text)"],
             "Trailing semi-colon is optional"
         );
-        assert_eq!(
+        pretty_eq!(
             split_statements("CREATE TABLE foo (bar text);"),
             vec!["CREATE TABLE foo (bar text);"],
             "We preserve the semi-colons"
         );
-        assert_eq!(
+        pretty_eq!(
             split_statements("CREATE TABLE foo (bar text); INSERT into foo (bar) VALUES ('hi')"),
             vec![
                 "CREATE TABLE foo (bar text);",
                 "INSERT into foo (bar) VALUES ('hi')"
             ]
         );
-        assert_eq!(
+        pretty_eq!(
             split_statements("invalid sql; but we don't care because we don't really parse it;"),
             vec![
                 "invalid sql;",
                 "but we don't care because we don't really parse it;"
             ]
         );
-        assert_eq!(
+        pretty_eq!(
             split_statements("INSERT INTO foo (bar) VALUES ('semicolon in string: ;')"),
             vec!["INSERT INTO foo (bar) VALUES ('semicolon in string: ;')"]
         );
-        assert_eq!(
+        pretty_eq!(
             split_statements(
                 "INSERT INTO foo (bar) VALUES (\"semicolon in double-quoted string: ;\")"
             ),
             vec!["INSERT INTO foo (bar) VALUES (\"semicolon in double-quoted string: ;\")"]
         );
-        assert_eq!(
+        pretty_eq!(
             split_statements("INSERT INTO foo (bar) VALUES (`semicolon in backtick string: ;`)"),
             vec!["INSERT INTO foo (bar) VALUES (`semicolon in backtick string: ;`)"]
         );
-        assert_eq!(
+        pretty_eq!(
             split_statements(
                 "INSERT INTO foo (bar) VALUES ('interior quote and semicolon in string: ;''')"
             ),
             vec!["INSERT INTO foo (bar) VALUES ('interior quote and semicolon in string: ;''')"]
         );
-        assert_eq!(split_statements("INSERT INTO foo (bar) VALUES (\"interior quote and semicolon in double-quoted string: ;\"\"\")"), vec!["INSERT INTO foo (bar) VALUES (\"interior quote and semicolon in double-quoted string: ;\"\"\")"]);
-        assert_eq!(split_statements("INSERT INTO foo (bar) VALUES (`interior quote and semicolon in backtick string: ;```)"), vec!["INSERT INTO foo (bar) VALUES (`interior quote and semicolon in backtick string: ;```)"]);
-        assert_eq!(
+        pretty_eq!(split_statements("INSERT INTO foo (bar) VALUES (\"interior quote and semicolon in double-quoted string: ;\"\"\")"), vec!["INSERT INTO foo (bar) VALUES (\"interior quote and semicolon in double-quoted string: ;\"\"\")"]);
+        pretty_eq!(split_statements("INSERT INTO foo (bar) VALUES (`interior quote and semicolon in backtick string: ;```)"), vec!["INSERT INTO foo (bar) VALUES (`interior quote and semicolon in backtick string: ;```)"]);
+        pretty_eq!(
             split_statements("INSERT INTO foo (bar) VALUES (`semicolon after interior quote ``;`)"),
             vec!["INSERT INTO foo (bar) VALUES (`semicolon after interior quote ``;`)"]
         );
-        assert_eq!(
+        pretty_eq!(
             split_statements(
                 "CREATE TABLE [foo;bar] (bar: text); INSERT into foo (bar) VALUES ('hi')"
             ),
@@ -219,15 +250,27 @@ END;
 
     #[test]
     fn it_recognizes_strings() {
-        assert_eq!(
+        pretty_eq!(
             split_statements("INSERT INTO projects VALUES(';;;');"),
             vec!["INSERT INTO projects VALUES(';;;');",]
+        );
+        pretty_eq!(
+            split_statements("INSERT INTO projects VALUES('`;');"),
+            vec!["INSERT INTO projects VALUES('`;');",]
+        );
+        pretty_eq!(
+            split_statements("INSERT INTO projects VALUES('\"');"),
+            vec!["INSERT INTO projects VALUES('\"');",]
+        );
+        pretty_eq!(
+            split_statements("INSERT INTO projects VALUES(\"'\");"),
+            vec!["INSERT INTO projects VALUES(\"'\");",]
         );
     }
 
     #[test]
     fn it_closing_bracket() {
-        assert_eq!(
+        pretty_eq!(
             split_statements(
                 "UPDATE test SET str = 'update]'; UPDATE test SET str = 'second update';"
             ),
