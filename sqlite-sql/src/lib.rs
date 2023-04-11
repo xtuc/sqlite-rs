@@ -280,4 +280,63 @@ END;
             ]
         );
     }
+
+    #[test]
+    fn test_split_comments() {
+        // Taken from https://github.com/jvasile/sql_split/blob/main/src/lib.rs
+        pretty_eq!(
+            split_statements("SELECT * FROM foo; -- trailing comments are fine"),
+            vec!["SELECT * FROM foo;"]
+        );
+        pretty_eq!(
+            split_statements("SELECT * FROM foo -- trailing comments are fine"),
+            vec!["SELECT * FROM foo"],
+            "Fail trailing -- comment w/ no semicolon"
+        );
+        pretty_eq!(
+            split_statements(
+                "SELECT * FROM foo; -- trailing comments are fine\n Another statement"
+            ),
+            vec!["SELECT * FROM foo;", "Another statement",]
+        );
+        pretty_eq!(
+            split_statements("SELECT * FROM foo; -- trailing ; comments ; are ; fine"),
+            vec!["SELECT * FROM foo;"],
+            "trailing -- comment w/ multiple semicolons"
+        );
+        pretty_eq!(
+            split_statements("SELECT * FROM foo /* trailing comments are fine */"),
+            vec!["SELECT * FROM foo"],
+            "trailing block comment, no semicolon"
+        );
+        pretty_eq!(
+            split_statements("SELECT * FROM foo; /* trailing comments are fine */"),
+            vec!["SELECT * FROM foo;"],
+            "trailing block comment"
+        );
+        pretty_eq!(
+            split_statements(
+                "CREATE TABLE foo (\nbar text -- describe bar\nbaz int -- how many baz\n);"
+            ),
+            vec!["CREATE TABLE foo (\nbar text \nbaz int \n);"],
+            "multiline statement with --comments interspersed"
+        );
+        pretty_eq!(
+            split_statements(
+                "SELECT * FROM foo /* block comment mid-statement */ WHERE blah blah blah"
+            ),
+            vec!["SELECT * FROM foo  WHERE blah blah blah"],
+            "block comment mid-statement"
+        );
+        pretty_eq!(
+            split_statements("SELECT * FROM foo /* multiline\n\ncomments are fine mid-statement */ WHERE blah blah blah"),
+            vec!["SELECT * FROM foo  WHERE blah blah blah"]
+        );
+        assert!(split_statements("-- Start with a comment;SELECT * FROM foo;").is_empty());
+        pretty_eq!(
+            split_statements("-- Start with a comment\nSELECT * FROM foo;"),
+            vec!["SELECT * FROM foo;"],
+            "-- comment didn't know where to stop"
+        );
+    }
 }
