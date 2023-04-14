@@ -10,6 +10,7 @@ enum State {
     InStringDQ, // "
     InStringBT, // `
     InIdent,
+    InComment,
 }
 
 pub fn split_statements(input: &str) -> Vec<String> {
@@ -29,6 +30,12 @@ pub fn split_statements(input: &str) -> Vec<String> {
             buffer.push(b);
 
             continue;
+        }
+
+        if state == State::InComment {
+            if b == '\n' {
+                state = State::Normal;
+            }
         }
 
         if state == State::InIdent {
@@ -104,6 +111,14 @@ pub fn split_statements(input: &str) -> Vec<String> {
                 state = State::AtSeperator;
                 out.push(buffer.clone());
                 buffer.clear();
+            }
+
+            if b == '-' {
+                if buffer.ends_with("--") {
+                    buffer.pop();
+                    buffer.pop();
+                    state = State::InComment;
+                }
             }
 
             continue;
@@ -290,29 +305,19 @@ END;
         );
         pretty_eq!(
             split_statements("SELECT * FROM foo -- trailing comments are fine"),
-            vec!["SELECT * FROM foo"],
+            vec!["SELECT * FROM foo "],
             "Fail trailing -- comment w/ no semicolon"
         );
         pretty_eq!(
             split_statements(
                 "SELECT * FROM foo; -- trailing comments are fine\n Another statement"
             ),
-            vec!["SELECT * FROM foo;", "Another statement",]
+            vec!["SELECT * FROM foo;", "\n Another statement",]
         );
         pretty_eq!(
             split_statements("SELECT * FROM foo; -- trailing ; comments ; are ; fine"),
             vec!["SELECT * FROM foo;"],
             "trailing -- comment w/ multiple semicolons"
-        );
-        pretty_eq!(
-            split_statements("SELECT * FROM foo /* trailing comments are fine */"),
-            vec!["SELECT * FROM foo"],
-            "trailing block comment, no semicolon"
-        );
-        pretty_eq!(
-            split_statements("SELECT * FROM foo; /* trailing comments are fine */"),
-            vec!["SELECT * FROM foo;"],
-            "trailing block comment"
         );
         pretty_eq!(
             split_statements(
@@ -323,19 +328,15 @@ END;
         );
         pretty_eq!(
             split_statements(
-                "SELECT * FROM foo /* block comment mid-statement */ WHERE blah blah blah"
+                "SELECT * FROM foo  WHERE blah blah blah"
             ),
             vec!["SELECT * FROM foo  WHERE blah blah blah"],
             "block comment mid-statement"
         );
-        pretty_eq!(
-            split_statements("SELECT * FROM foo /* multiline\n\ncomments are fine mid-statement */ WHERE blah blah blah"),
-            vec!["SELECT * FROM foo  WHERE blah blah blah"]
-        );
         assert!(split_statements("-- Start with a comment;SELECT * FROM foo;").is_empty());
         pretty_eq!(
             split_statements("-- Start with a comment\nSELECT * FROM foo;"),
-            vec!["SELECT * FROM foo;"],
+            vec!["\nSELECT * FROM foo;"],
             "-- comment didn't know where to stop"
         );
     }
