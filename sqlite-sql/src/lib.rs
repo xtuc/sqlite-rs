@@ -35,6 +35,7 @@ pub fn split_statements(input: &str) -> Vec<String> {
         if state == State::InComment {
             if b == '\n' {
                 state = State::Normal;
+                continue;
             }
         }
 
@@ -309,11 +310,12 @@ END;
             "Fail trailing -- comment w/ no semicolon"
         );
         pretty_eq!(
-            split_statements(
-                "SELECT * FROM foo; -- trailing comments are fine\n Another statement"
-            ),
-            vec!["SELECT * FROM foo;", "\n Another statement",]
+            split_statements("SELECT * FROM foo; -- trailing comments are fine\nSELECT 1;"),
+            vec!["SELECT * FROM foo;", "SELECT 1;",]
         );
+        pretty_eq!(split_statements("SELECT 1; --test"), vec!["SELECT 1;",]);
+        pretty_eq!(split_statements("SELECT 1;\n --test"), vec!["SELECT 1;",]);
+        pretty_eq!(split_statements("--test\nSELECT 1;"), vec!["SELECT 1;",]);
         pretty_eq!(
             split_statements("SELECT * FROM foo; -- trailing ; comments ; are ; fine"),
             vec!["SELECT * FROM foo;"],
@@ -323,13 +325,11 @@ END;
             split_statements(
                 "CREATE TABLE foo (\nbar text -- describe bar\nbaz int -- how many baz\n);"
             ),
-            vec!["CREATE TABLE foo (\nbar text \nbaz int \n);"],
+            vec!["CREATE TABLE foo (\nbar text baz int );"],
             "multiline statement with --comments interspersed"
         );
         pretty_eq!(
-            split_statements(
-                "SELECT * FROM foo  WHERE blah blah blah"
-            ),
+            split_statements("SELECT * FROM foo  WHERE blah blah blah"),
             vec!["SELECT * FROM foo  WHERE blah blah blah"],
             "block comment mid-statement"
         );
